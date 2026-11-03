@@ -1,0 +1,21 @@
+# Python environments and caches
+.venv/
+.venv-*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Local editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Raw CICIDS 2017 captures are downloaded separately and are too large for Git
+/data/*.csv
+
+# Generated training and evaluation outputs
+*.log
+*.tmp
