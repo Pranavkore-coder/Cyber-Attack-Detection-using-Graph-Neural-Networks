@@ -1,150 +1,128 @@
 # Cyber Attack Detection with Graph Neural Networks
 
-An end-to-end graph machine learning project for detecting malicious network entities from CICIDS 2017 flow records. The project transforms network flows into a directed communication graph, trains a hybrid GraphSAGE + GAT node classifier, evaluates it with class-aware metrics, and exports an explainable forensic subgraph for interactive investigation.
+An end-to-end defensive security research project that turns network flows into a communication graph, trains a hybrid GraphSAGE/GAT model to classify hosts as benign or malicious, and exposes model attention in an interactive forensic explorer.
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-Geometric-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch-geometric.readthedocs.io/)
-[![Frontend](https://img.shields.io/badge/Frontend-D3.js-F9A03C?logo=d3.js&logoColor=white)](https://d3js.org/)
-[![Dataset](https://img.shields.io/badge/Dataset-CICIDS%202017-1F2937)](https://www.unb.ca/cic/datasets/ids-2017.html)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![PyTorch Geometric](https://img.shields.io/badge/PyTorch%20Geometric-GNN-3C2179)](https://pytorch-geometric.readthedocs.io/)
+[![D3.js](https://img.shields.io/badge/Visualization-D3.js-F9A03C?logo=d3.js&logoColor=white)](https://d3js.org/)
+[![Dataset](https://img.shields.io/badge/Dataset-CICIDS%202017-263238)](https://www.unb.ca/cic/datasets/ids-2017.html)
 
-## Project Overview
+## Overview
 
-Traditional flow-by-flow classifiers can miss the relationships between hosts. This project models those relationships directly:
+Rather than treating each flow as an isolated record, the pipeline models IP addresses as nodes and source-to-destination communication as directed edges. A node-level classifier learns from both engineered traffic features and its graph neighborhood.
 
 ```text
-CICIDS 2017 flows
-        |
-        v
-Cleaning + validation + feature engineering
-        |
-        v
-Directed IP communication graph
-        |
-        v
-GraphSAGE -> GraphSAGE -> multi-head GAT
-        |
-        v
-Node-level malicious/benign predictions
-        |
-        v
-Attention-based forensic subgraph + interactive D3 explorer
+CICIDS-style flow records
+        -> cleaning and feature engineering
+        -> directed host communication graph
+        -> GraphSAGE -> GraphSAGE -> multi-head Graph Attention
+        -> benign / malicious node scores
+        -> attention subgraph and interactive investigation view
 ```
 
-The system treats each IP address as a node and each directed source-to-destination relationship as an edge. Node features capture traffic directionality, volume, packet rate, port diversity, protocol entropy, flow duration, and malicious-flow ratio.
+The repository includes the training and evaluation code, a trained checkpoint, a serialized graph, explainability outputs, and a browser-based demo. The included artifacts let reviewers explore the result without first downloading the raw dataset or training the model.
 
-## Highlights
+## What It Demonstrates
 
-- Reproducible ETL pipeline with configurable data loading, cleaning, clipping, scaling, and stratified masks.
-- Directed graph construction that preserves traffic asymmetry for exfiltration, C2, and lateral movement signals.
-- Hybrid `GraphSAGE + GAT` architecture for neighborhood aggregation followed by attention-based representation learning.
-- Imbalance-aware training using `BCEWithLogitsLoss(pos_weight=...)` and early stopping on validation PR-AUC.
-- Stratified k-fold cross-validation with PR-AUC, F1, precision, and recall.
-- Explainability workflow that selects a high-confidence test node, extracts its k-hop neighborhood, and exports attention weights.
-- Interactive browser-based forensic graph explorer with node inspection, attack confidence, feature fingerprints, and graph reset/focus controls.
+- **Graph construction:** Builds host-level features and directed communication edges from flow records.
+- **Imbalance-aware learning:** Uses positive-class weighting and early stopping based on validation PR-AUC.
+- **Hybrid GNN:** Applies two GraphSAGE layers followed by a multi-head Graph Attention layer.
+- **Evaluation:** Reports precision, recall, F1, PR-AUC, a classification report, and stratified k-fold results.
+- **Explainability:** Extracts a k-hop neighborhood, exports edge attention, and generates visual reports.
+- **Investigation UI:** D3.js explorer for inspecting node labels, model scores, features, and attention-weighted links.
 
-## Repository Structure
+## Project Structure
 
-| Path | Purpose |
+| File | Description |
 | --- | --- |
-| `data_pipeline.py` | Loads CICIDS flows and builds a validated PyTorch Geometric graph. |
-| `train_gnn.py` | Defines and trains the hybrid GraphSAGE/GAT classifier. |
-| `cross_validate_gnn.py` | Runs stratified k-fold evaluation. |
-| `phase5_evaluation_explainability.py` | Evaluates the model and exports the explainability artifacts. |
-| `index.html`, `app.js`, `styles.css` | D3-based forensic graph explorer. |
-| `cyber_graph_data.pt` | Serialized graph used by the included demo artifacts. |
-| `best_cyber_gnn.pth` | Saved model checkpoint. |
-| `forensic_graph.json` | Attention subgraph consumed by the web explorer. |
-| `*_graph.png` | Evaluation visualizations generated by the analysis workflow. |
+| `data_pipeline.py` | Loads flow CSVs, engineers node features, and writes a PyTorch Geometric graph. |
+| `train_gnn.py` | Defines and trains the GraphSAGE/GAT node classifier. |
+| `cross_validate_gnn.py` | Runs stratified k-fold model evaluation. |
+| `phase5_evaluation_explainability.py` | Evaluates the saved model and exports explainability artifacts. |
+| `index.html`, `app.js`, `styles.css` | Interactive D3.js forensic graph explorer. |
+| `cyber_graph_data.pt`, `best_cyber_gnn.pth` | Example graph and trained model checkpoint. |
+| `forensic_graph.json` | Graph data loaded by the browser demo. |
+| `*_graph.png`, `explainability_report.png` | Generated evaluation and explainability figures. |
 
 ## Quick Start
 
-### 1. Create an environment
+### Requirements
 
-Python 3.10+ is recommended.
+- Python 3.10 or newer
+- PyTorch and PyTorch Geometric (CPU or CUDA build)
+- Raw CICIDS 2017 data only if rebuilding the graph from source
+
+Create an environment and install the project dependencies:
 
 ```bash
 python -m venv .venv
+```
+
+```powershell
 # Windows PowerShell
 .\.venv\Scripts\Activate.ps1
-# macOS/Linux
+```
+
+```bash
+# macOS / Linux
 source .venv/bin/activate
+```
+
+```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Install the PyTorch build appropriate for your CPU or CUDA setup before installing PyTorch Geometric if your platform requires a specific wheel. See the [official PyG installation guide](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html).
+For GPU use, install the PyTorch build that matches your CUDA setup by following the [official PyTorch instructions](https://pytorch.org/get-started/locally/). See the [PyTorch Geometric installation guide](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html) if your platform needs a specific build.
 
-### 2. Run the ETL pipeline
+### Explore the included demo
 
-The pipeline can generate synthetic flows when `data_path=None`, or load CICIDS CSV files from a directory.
-
-```bash
-python data_pipeline.py
-```
-
-The checked-in entry point is configured to read `data/` and writes `cyber_graph_data.pt`.
-
-### 3. Train the model
-
-```bash
-python train_gnn.py
-```
-
-This writes `best_cyber_gnn.pth` and prints validation progress plus final test metrics.
-
-### 4. Run cross-validation
-
-```bash
-python cross_validate_gnn.py --graph cyber_graph_data.pt --folds 5 --epochs 40
-```
-
-### 5. Generate explainability artifacts
-
-```bash
-python phase5_evaluation_explainability.py
-```
-
-This produces the metrics/plots and refreshes `forensic_graph.json` for the frontend.
-
-### 6. Open the interactive explorer
-
-Because browsers restrict local `fetch()` requests, serve the repository through a local HTTP server:
+From the repository root, start a local web server:
 
 ```bash
 python -m http.server 8000
 ```
 
-Open <http://localhost:8000> and select nodes in the graph to inspect their labels, model disposition, confidence, and behavioral features.
+Open [http://localhost:8000](http://localhost:8000). Select nodes to inspect their labels, predicted disposition, attack confidence, and engineered features. The included `forensic_graph.json` powers this view.
 
-## Data
+### Rebuild and train
 
-The project is designed for the [CICIDS 2017 dataset](https://www.unb.ca/cic/datasets/ids-2017.html). The raw CSV captures are intentionally excluded from version control because they are large and should be downloaded from the original source. Place the selected day files in `data/`, then update `PipelineConfig.dataset_files` or `data_path` as needed.
+Raw flow CSVs are not included. Download CICIDS 2017 from the [Canadian Institute for Cybersecurity](https://www.unb.ca/cic/datasets/ids-2017.html), place the required files in `data/`, and check `PipelineConfig.dataset_files` and `data_path` near the bottom of `data_pipeline.py` to match your local files.
 
-The included `.pt`, `.pth`, and `forensic_graph.json` files make the visual demo available without requiring a full retraining run.
+Then run the pipeline and training workflow:
 
-## Model and Evaluation Notes
+```bash
+python data_pipeline.py
+python train_gnn.py
+python cross_validate_gnn.py --graph cyber_graph_data.pt --folds 5 --epochs 40
+python phase5_evaluation_explainability.py
+```
 
-The classifier uses three message-passing stages:
+The pipeline writes `cyber_graph_data.pt`; training writes `best_cyber_gnn.pth`; the explainability script updates `forensic_graph.json` and the report figures. Dataset variants, preprocessing, split seeds, hardware, and decision threshold can all affect results.
 
-1. `SAGEConv` learns a robust neighborhood representation.
-2. A second `SAGEConv` compresses the representation.
-3. Multi-head `GATConv` assigns learned attention to graph edges before binary classification.
+## Evaluation Artifacts
 
-The task is node classification with benign (`0`) and malicious (`1`) labels. Because malicious nodes are the minority class, training uses a positive-class weight derived from the training split. PR-AUC is used as the primary validation signal because it is more informative than accuracy for imbalanced detection problems.
+The checked-in figures are generated outputs, not claims of production performance.
 
-> The checked-in artifacts are an experimental research/demo snapshot, not a production intrusion detection system. Results depend on the dataset variant, preprocessing configuration, random seed, hardware, and threshold.
+![Explainability report](explainability_report.png)
 
-## Responsible Use
+![Performance split](performance_split_graph.png)
 
-Use this project for authorized security research, defensive monitoring, and education. Do not apply predictions to networks or hosts without permission. Model outputs are decision-support signals and require analyst validation.
+![Literature comparison](literature_comparison_graph.png)
 
-## Future Improvements
+For reproducible reporting, run the evaluation scripts on the dataset version and configuration you intend to discuss, then cite the resulting metrics and split details rather than relying on screenshots alone.
 
-- Add temporal graph snapshots instead of a single static graph.
-- Calibrate alert thresholds against an operational false-positive budget.
-- Track experiments and metrics across seeds with a reproducible configuration file.
-- Add unit tests for feature construction and graph invariants.
-- Package the explorer and inference workflow for deployment behind an authenticated service.
+## Limitations and Responsible Use
 
-## License
+- This is an experimental, offline research/demo workflow, not a production intrusion detection system.
+- Predictions are decision-support signals; validate alerts with independent evidence before taking action.
+- Use only on data and networks you are authorized to analyze.
+- Raw packet/flow captures are intentionally excluded from Git. The `data/` CSVs can exceed GitHub's file-size limits and should be obtained from their source under its applicable terms.
+- No software license has been selected for this repository. Add one before reuse or redistribution if you intend to grant explicit permissions.
 
-No license has been selected yet. Add a license before accepting contributions or distributing this work publicly.
+## Resume Summary
+
+**Cyber Attack Detection with Graph Neural Networks** | Python, PyTorch Geometric, scikit-learn, D3.js
+
+Built an end-to-end network-flow analytics pipeline that constructs directed host communication graphs, trains an imbalance-aware GraphSAGE/GAT node classifier, evaluates performance with PR-AUC and stratified cross-validation, and visualizes attention-based forensic neighborhoods in an interactive web application.
